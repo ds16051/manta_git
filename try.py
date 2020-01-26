@@ -9,12 +9,27 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 
-e = torch.tensor([])
-i1 = torch.randn(3,299,299)
-i1 = torch.unsqueeze(i1,dim=0)
-print(i1.shape)
-r = torch.cat((e,i1,i1,i1,i1),0)
-print(r.shape)
+
+rand = torch.randn(5)
+print(rand.shape)
+m = torch.max(rand)
+print(m.shape)
+
+
+
+
+
+#e = torch.tensor([])
+#val1 = 1.0
+#val2 = 2.0
+#e = torch.cat((e,torch.tensor([val1]),torch.tensor([val2])),dim = 0)
+#print(e.shape)
+# e = torch.tensor([])
+# i1 = torch.randn(3,299,299)
+# i1 = torch.unsqueeze(i1,dim=0)
+# print(i1.shape)
+# r = torch.cat((e,i1,i1,i1,i1),0)
+# print(r.shape)
 
 #l = [0,1,2,3,4]
 #inds = [0,2]

@@ -82,9 +82,9 @@ def batch_select(p,k): #select p individuals, k photos of each
 ###For Each Batch###
 
 ###Compute Forward Pass On Batch###
-p = 8 #individuals per batch
-k = 4 #images per individual
-my_batch = batch_select(p,k) #selects a size 32 batch
+#p = 8 #individuals per batch
+#k = 4 #images per individual
+my_batch = batch_select(p=8,k=4) #selects a size 32 batch
 my_batch_ims = my_batch[0] 
 my_batch_ids = my_batch[1]
 #embeddings = model(my_batch_ims)[0] #extremely slow, but verified this is 32 * 128, as expected
@@ -92,13 +92,13 @@ embeddings = torch.randn(32,128) #use this for now for speed
 
 ###Compute Distance Matrix On Embeddings###
 
-#returns a bxb matrix of pairwise euclidean distances, where b is batch size, and diagonal elements are -1
+#returns a bxb tensor of pairwise euclidean distances, where b is batch size, and diagonal elements are -1
 def pairwise_distances(embeddings):
     b = embeddings.shape[0]
     distance_matrix = torch.zeros(b,b)
     for i in range(b):
         for j in range(b):
-            distance_matrix[i][j] = torch.dist(embeddings[i],embeddings[j])
+            distance_matrix[i][j] = torch.dist(embeddings[i],embeddings[j]) #euclidean distance
             if i == j: distance_matrix[i][j] = -1
     return distance_matrix
 
@@ -110,35 +110,41 @@ def pairwise_distances(embeddings):
 we treat each image in turn as the anchor, and calculate a triplet loss for each anchor.
 the final loss is the average of the loss for each anchor
 to find the loss for each anchor a:
-    1.) find d_pos = max[d(a,p)], where p has same identity as a
-    2.) find d_neg = min[d(a,p)], where p has different identity to a
-    3.) the loss for this anchor is max(d_pos-d_neg + margin,0)
+    1.) find d_pos = max[d(a,p)], where p has same identity as a (this is the hardest positive)
+    2.) find d_neg = min[d(a,p)], where p has different identity to a (this is the hardest negative)
+    3.) the loss for this anchor is max(d_pos - d_neg + margin,0)
 """
-def batch_hard_triplet_loss(labels,embeddings,margin):
-    distance_matrix = pairwise_distances(embeddings) #diagonal elements are -1, use <-0.5 to test validity
-    #embeddings never used after this, task is now to derive triplet loss from distance_matrix
-    #recall that the batch construction is such that we have k ims of one individual, followed by k ims of next...
-    
+def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for one batch, as 0d tensor
+    margin = float(margin)
+    distance_matrix = pairwise_distances(embeddings) 
+    #embeddings never used after this, derive triplet loss from distance_matrix
+    all_triplet_losses = torch.tensor([]) #list of triplet losses for each anchor
     
     #for each anchor
     for anc in range(distance_matrix.shape[0]):
-        #find largest distance to common identity
+        all_p_dists =torch.tensor([]) #all distances to positives with relation to this anc
+        all_n_dists =torch.tensor([]) #all distances to negatives with relation to this anc
         for i in range(distance_matrix.shape[1]):
+            if(not (i == anc)): # if i == anc then ignore since this is self comparison
+                if(labels[i]==labels[anc]): #positive
+                    all_p_dists = torch.cat((all_p_dists,torch.unsqueeze(distance_matrix[anc][i],dim=0)),dim = 0)
+                    #distance_matrix[anc][i] is a 0d tensor, so we make it 1d (for concatenation) using unsqueeze
+                else: #negative
+                    all_n_dists = torch.cat((all_n_dists,torch.unsqueeze(distance_matrix[anc][i],dim=0)),dim = 0)
+            
+        max_p_dist = torch.max(all_p_dists) #maximum distance to positive with relation to this anc, 0d tensor
+        min_n_dist = torch.min(all_n_dists) #minimum distance to negative with relation to this anc, 0d tensor
+        triplet_loss_anc = torch.abs(max_p_dist - min_n_dist + torch.tensor(margin)) #batch hard triplet loss for this anchor, 0d tensor
+        all_triplet_losses = torch.cat((all_triplet_losses,torch.unsqueeze(triplet_loss_anc,dim=0)),dim=0)    
+
+    average_triplet_loss = torch.mean(all_triplet_losses)
+    return average_triplet_loss
 
 
-
-
-#loss = batch_hard_triplet_loss(my_batch_ids,embeddings,0.2)
-#[row][column]
-
-
-
-
-
-
-
-
+loss = batch_hard_triplet_loss(my_batch_ids,embeddings,0.2)
+print(loss)
 
 
 #to print an image
 #(transforms.ToPILImage()(image)).show()
+#[row][column]
