@@ -77,14 +77,59 @@ def batch_select(p,k): #select p individuals, k photos of each
             batch_labels.append(_id) # append corresponding id
 
     return(batch_images,batch_labels) 
+    #verified correct (by eye)
 
+###For Each Batch###
 
-my_batch = batch_select(p=8,k=4) #selects a size 32 batch
+###Compute Forward Pass On Batch###
+p = 8 #individuals per batch
+k = 4 #images per individual
+my_batch = batch_select(p,k) #selects a size 32 batch
 my_batch_ims = my_batch[0] 
 my_batch_ids = my_batch[1]
-#verified correct (by eye)
+#embeddings = model(my_batch_ims)[0] #extremely slow, but verified this is 32 * 128, as expected
+embeddings = torch.randn(32,128) #use this for now for speed
+
+###Compute Distance Matrix On Embeddings###
+
+#returns a bxb matrix of pairwise euclidean distances, where b is batch size, and diagonal elements are -1
+def pairwise_distances(embeddings):
+    b = embeddings.shape[0]
+    distance_matrix = torch.zeros(b,b)
+    for i in range(b):
+        for j in range(b):
+            distance_matrix[i][j] = torch.dist(embeddings[i],embeddings[j])
+            if i == j: distance_matrix[i][j] = -1
+    return distance_matrix
+
+#pairwise_distances = pairwise_distances(embeddings)
+#print(pairwise_distances)
+
+###Compute Batch-Hard Triplet Loss###
+"""
+we treat each image in turn as the anchor, and calculate a triplet loss for each anchor.
+the final loss is the average of the loss for each anchor
+to find the loss for each anchor a:
+    1.) find d_pos = max[d(a,p)], where p has same identity as a
+    2.) find d_neg = min[d(a,p)], where p has different identity to a
+    3.) the loss for this anchor is max(d_pos-d_neg + margin,0)
+"""
+def batch_hard_triplet_loss(labels,embeddings,margin):
+    distance_matrix = pairwise_distances(embeddings) #diagonal elements are -1, use <-0.5 to test validity
+    #embeddings never used after this, task is now to derive triplet loss from distance_matrix
+    #recall that the batch construction is such that we have k ims of one individual, followed by k ims of next...
+    
+    
+    #for each anchor
+    for anc in range(distance_matrix.shape[0]):
+        #find largest distance to common identity
+        for i in range(distance_matrix.shape[1]):
 
 
+
+
+#loss = batch_hard_triplet_loss(my_batch_ids,embeddings,0.2)
+#[row][column]
 
 
 

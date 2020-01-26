@@ -1,0 +1,2 @@
+https://omoindrot.github.io/triplet-loss
+https://arxiv.org/pdf/1703.07737.pdf
