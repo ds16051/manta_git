@@ -79,19 +79,7 @@ def batch_select(p,k): #select p individuals, k photos of each
     return(batch_images,batch_labels) 
     #verified correct (by eye)
 
-###For Each Batch###
-
-###Compute Forward Pass On Batch###
-#p = 8 #individuals per batch
-#k = 4 #images per individual
-my_batch = batch_select(p=8,k=4) #selects a size 32 batch
-my_batch_ims = my_batch[0] 
-my_batch_ids = my_batch[1]
-#embeddings = model(my_batch_ims)[0] #extremely slow, but verified this is 32 * 128, as expected
-embeddings = torch.randn(32,128) #use this for now for speed
-
 ###Compute Distance Matrix On Embeddings###
-
 #returns a bxb tensor of pairwise euclidean distances, where b is batch size, and diagonal elements are -1
 def pairwise_distances(embeddings):
     b = embeddings.shape[0]
@@ -105,7 +93,7 @@ def pairwise_distances(embeddings):
 #pairwise_distances = pairwise_distances(embeddings)
 #print(pairwise_distances)
 
-###Compute Batch-Hard Triplet Loss###
+###Compute Batch-Hard Triplet Loss On Embeddings###
 """
 we treat each image in turn as the anchor, and calculate a triplet loss for each anchor.
 the final loss is the average of the loss for each anchor
@@ -141,6 +129,19 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
     return average_triplet_loss
 
 
+###For Each Batch###
+#We treat a batch as an epoch
+
+###Compute Embeddings On Batch###
+#p = 8 #individuals per batch
+#k = 4 #images per individual
+my_batch = batch_select(p=8,k=4) #randomly selects a size 32 batch
+my_batch_ims = my_batch[0] 
+my_batch_ids = my_batch[1]
+#embeddings = model(my_batch_ims)[0] #extremely slow, but verified this is 32 * 128, as expected
+embeddings = torch.randn(32,128) #use this for now for speed
+
+###Compute Loss On Batch ###
 loss = batch_hard_triplet_loss(my_batch_ids,embeddings,0.2)
 print(loss)
 
