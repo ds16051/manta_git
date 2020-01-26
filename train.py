@@ -95,4 +95,5 @@ my_batch_ids = my_batch[1]
 
 
 
-
+#to print an image
+#(transforms.ToPILImage()(image)).show()
