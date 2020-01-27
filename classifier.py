@@ -37,10 +37,15 @@ Once the sets F and V are defined as described, we try out values of T, and choo
 """
 
 """
-Simpler starting point (and faster) solutii=in that osnn
+Simpler starting point (and faster) solution than OSNN
 
 Average all stored embeddings for each class, and assign a test sample to the closest, but with a threshold for assigning unknown
 """
 
-### OSNN Test using Iris dataset
+### OSNN using Iris dataset ###
+iris = pd.read_csv("iris.csv")
+features = iris[['a','b','c','d']].values
+labels = np.squeeze(iris[['id']].values)
+print(np.unique(labels))
+
 

@@ -7,6 +7,8 @@ from PIL import Image
 from dataset import MantaDataset
 from torch.utils.data import DataLoader
 import random
+import matplotlib.pyplot as plt
+
 
 load_manta_dict_pt = True #set to true to load manta_dict from .pt file, set to false to construct manta_dict from manta_dataset, without loading a .pt file
 
@@ -135,6 +137,7 @@ optimiser= optim.Adam(params = model.parameters(),lr = learning_rate,weight_deca
 
 
 epochs = 1
+train_losses = np.zeros(epochs)
 ###For Each Batch###
 #We treat a batch as an epoch
 for epoch in range(0,epochs):
@@ -150,13 +153,19 @@ for epoch in range(0,epochs):
     ###Compute Loss On Batch ###
     loss = batch_hard_triplet_loss(batch_ids,embeddings,0.2)
     print(loss)
+    losses[epoch] = loss
     loss.backward()
     print("backprop done")
     optimiser.step()
     optimiser.zero_grad()
     print("optimiser done")
+    
 
 print("1 epoch complete")
+
+#plot losses
+plt.plot(train_losses)
+plt.savefig("figs/train_loss")
 
     
 
