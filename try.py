@@ -14,6 +14,7 @@ rand = torch.randn(5)
 print(rand.shape)
 m = torch.max(rand)
 print(m.shape)
+print(torch.uns)
 
 
 
