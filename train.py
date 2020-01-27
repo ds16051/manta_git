@@ -128,23 +128,39 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
     average_triplet_loss = torch.mean(all_triplet_losses)
     return average_triplet_loss
 
+learning_rate = 0.001
+weight_decay = 1e-5
+###Optimiser###
+optimiser= optim.Adam(params = model.parameters(),lr = learning_rate,weight_decay = weight_decay)
 
+
+epochs = 1
 ###For Each Batch###
 #We treat a batch as an epoch
+for epoch in range(0,epochs):
+    #Select Batch
+    batch = batch_select(p=8,k=4) #randomly selects a size 32 batch
+    batch_ims = batch[0] 
+    batch_ids = batch[1]
 
-###Compute Embeddings On Batch###
-#p = 8 #individuals per batch
-#k = 4 #images per individual
-my_batch = batch_select(p=8,k=4) #randomly selects a size 32 batch
-my_batch_ims = my_batch[0] 
-my_batch_ids = my_batch[1]
-#embeddings = model(my_batch_ims)[0] #extremely slow, but verified this is 32 * 128, as expected
-embeddings = torch.randn(32,128) #use this for now for speed
+    ###Compute Embeddings On Batch###
+    embeddings = model(batch_ims)[0] #extremely slow, but verified this is 32 * 128, as expected
+    #embeddings = torch.randn(32,128) #use this for now for speed
+    
+    ###Compute Loss On Batch ###
+    loss = batch_hard_triplet_loss(batch_ids,embeddings,0.2)
+    print(loss)
+    loss.backward()
+    print("backprop done")
+    optimiser.step()
+    optimiser.zero_grad()
+    print("optimiser done")
 
-###Compute Loss On Batch ###
-loss = batch_hard_triplet_loss(my_batch_ids,embeddings,0.2)
-print(loss)
+print("1 epoch complete")
 
+    
+
+###Next look at optimiser...###
 
 #to print an image
 #(transforms.ToPILImage()(image)).show()
