@@ -52,7 +52,7 @@ unique_labels = np.unique(labels)
 
 
 ###OSNN Classification###
-#returns an identity from train_labels, or the string "unknown id". trains_embs must correspond to train_labels
+#returns an identity from train_labels, or the string "unknown". trains_embs must correspond to train_labels
 def osnn_classify(train_embs, train_labels, in_emb, threshold = 0.5):
     #compute list of distances from in_emb to each of train_embs
     distances = np.zeros(train_embs.shape[0])
@@ -79,16 +79,36 @@ def osnn_classify(train_embs, train_labels, in_emb, threshold = 0.5):
     #decision
     r = t_dist/u_dist
     if(r < threshold): result = t_label
-    else: result = "unknown id"
+    else: result = "unknown"
     return result
 
-
-
+"""
+The threshold T is between 0 and 1.
+An optimisation procedure can be used to select T
+We have a training set of labelled embeddings. 
+Among the _classes_ that occur in the training set, half are chosen to act as “known” classes, the other half as “unknown”.
+The training set is divided into a fitting set F that contains half for the instances of the “known” classes, and a validation set V that contains the other half of the instances of the “known” classes, and all instances of the “unknown” classes.
+Once the sets F and V are defined as described, we try out values of T, and choose the best, based on overall classification accuracy.
+"""
 ###OSNN Training###
-#F is fitting set, V is validation set. Returns trained threshold
-def osnn_train(F,V,threshold_start = 0.5):
-    threshold = threshold_start
-    return threshold
+#F is fitting set, V is validation set. Returns best threshold from threshold options, a list of options
+def osnn_train(F_emb,F_labels,V_emb,V_labels,threshold_options):
+    accuracies = [] #accuracy for each threshold in threshold_options
+    #for each threshold to evaluate
+    for i in range(len(threshold_options)):
+        #for each validation sample
+        t = threshold_options[i]
+        corrects = 0
+        total = V_emb.shape[0]
+        for j in range(V_emb.shape[0]):
+            inp = V_emb[j]
+            target = V_labels[j]
+            prediction = osnn_classify(F_emb,F_labels,inp,t)
+            if(prediction == target): corrects = corrects + 1
+        accuracies.append(corrects/total)
+    
+    best_threshold = threshold_options[np.argmax(accuracies)]
+    return best_threshold
 
 
 
