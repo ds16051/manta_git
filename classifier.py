@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-
+import math
 """
 Once the triplet loss network is trained, it will project images into an embedding space, in which euclidean distance is a measure of similarity: images of the same manta have close embeddings, while images of different mantas have distant embeddings.  
 There are then a number of options for actual classification:
@@ -12,7 +12,7 @@ Maybe, if we have multiple embeddings for an individual in teh database, we can 
 
 """
 The open set scenario is one in which there are no a priori training samples for some classes that might appear during testing. For an example, we must return:
-    1.) "this sample us unknown" or
+    1.) "this sample s unknown" or
     2.) "this sample is known and has identity x"
 """
 
@@ -43,9 +43,65 @@ Average all stored embeddings for each class, and assign a test sample to the cl
 """
 
 ### OSNN using Iris dataset ###
+
+###Load Dataset###
 iris = pd.read_csv("iris.csv")
 features = iris[['a','b','c','d']].values
 labels = np.squeeze(iris[['id']].values)
-print(np.unique(labels))
+unique_labels = np.unique(labels)
+
+
+###OSNN Classification###
+#returns an identity from train_labels, or the string "unknown id". trains_embs must correspond to train_labels
+def osnn_classify(train_embs, train_labels, in_emb, threshold = 0.5):
+    #compute list of distances from in_emb to each of train_embs
+    distances = np.zeros(train_embs.shape[0])
+    for i in range(train_embs.shape[0]):
+        distances[i] = np.linalg.norm(in_emb - features[i])
+    
+    #find closest embedding to in_emb (called t)
+    t_index = np.argmin(distances)
+    t_dist = distances[t_index]
+    t = train_embs[t_index]
+    t_label = train_labels[t_index]
+
+    #find closest embedding to in_emb with a different label to t (called u)
+    u_dist = math.inf
+    u_index = -1
+    for j in range(train_embs.shape[0]):
+        if(not train_labels[j] == t_label):
+            if distances[j] < u_dist:
+                u_dist = distances[j]
+                u_index = j
+    u_label = train_labels[u_index]
+    u = train_embs[u_index]
+
+    #decision
+    r = t_dist/u_dist
+    if(r < threshold): result = t_label
+    else: result = "unknown id"
+    return result
+
+
+
+###OSNN Training###
+#F is fitting set, V is validation set. Returns trained threshold
+def osnn_train(F,V,threshold_start = 0.5):
+    threshold = threshold_start
+    return threshold
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
