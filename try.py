@@ -8,13 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
+import random
 
-
-rand = torch.randn(5)
-print(rand.shape)
-m = torch.max(rand)
-print(m.shape)
-print(torch.uns)
+ar = np.array([])
+ar = np.append(ar,1)
+print(ar)
 
 
 

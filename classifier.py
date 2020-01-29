@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import math
+import random
 """
 Once the triplet loss network is trained, it will project images into an embedding space, in which euclidean distance is a measure of similarity: images of the same manta have close embeddings, while images of different mantas have distant embeddings.  
 There are then a number of options for actual classification:
@@ -41,15 +42,6 @@ Simpler starting point (and faster) solution than OSNN
 
 Average all stored embeddings for each class, and assign a test sample to the closest, but with a threshold for assigning unknown
 """
-
-### OSNN using Iris dataset ###
-
-###Load Dataset###
-iris = pd.read_csv("iris.csv")
-features = iris[['a','b','c','d']].values
-labels = np.squeeze(iris[['id']].values)
-unique_labels = np.unique(labels)
-
 
 ###OSNN Classification###
 #returns an identity from train_labels, or the string "unknown". trains_embs must correspond to train_labels
@@ -110,6 +102,55 @@ def osnn_train(F_emb,F_labels,V_emb,V_labels,threshold_options):
     best_threshold = threshold_options[np.argmax(accuracies)]
     return best_threshold
 
+
+
+### OSNN using Iris dataset ###
+
+###Load Dataset###
+iris = pd.read_csv("iris.csv")
+features = iris[['a','b','c','d']].values
+labels = np.squeeze(iris[['id']].values)
+unique_labels = np.unique(labels) 
+
+###classification###
+train_embs = features[0:features.shape[0]-2]
+train_labels = labels[0:labels.shape[0]-2]
+x = features[features.shape[0]-1]
+y = labels[labels.shape[0]-1]
+pred = osnn_classify(train_embs,train_labels,x,1)
+print(pred)
+print(y)
+
+
+###Create Sets F and V###
+"""
+Among the _classes_ that occur in the training set, half are chosen to act as “known” classes, the other half as “unknown”.
+The training set is divided into a fitting set F that contains half of the instances of the “known” classes, and a validation set V that contains the other half of the instances of the “known” classes, and all instances of the “unknown” classes.
+"""
+def create_sets(train_embs,train_labels):
+    possible_labels = np.unique(train_labels)
+    V_embs = np.array([])
+    F_embs = np.array([])
+    V_labels = []
+    F_labels = []
+    #we want half of classes to act as "known", and half as unknown
+    known_classes = random.sample(possible_labels,np.floor(possible_labels.shape[0] / 2)) #classes chosen as known
+    unknown_classes =  list(set(possible_labels)-set(known_labels)) #classes chosen as unknown
+    
+    #V must contain all unknown instances, and half the known instances
+    #F must contain half the known instances
+    for i in range(train_embs.shape[0]):
+        if(train_labels[i] in unknown):
+            V_labels.append("unknown")
+            V_embs = np.append(V_embs,train_embs[i])
+        else: 
+            #50/50 chance of adding to V or F
+            
+    
+    
+
+
+    return(F_embs,F_labels,V_embs,V_labels)
 
 
 
