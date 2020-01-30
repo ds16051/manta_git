@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 import math
 import random
+
+# IN THIS FILE ONLY: ALL FEATURE/EMBEDDING DATA SHOULD BE NUMPY ARRAYS, OTHER ITEMS MAY BE LISTS
+# note that len can still be used with numpy arrays
+
 """
 Once the triplet loss network is trained, it will project images into an embedding space, in which euclidean distance is a measure of similarity: images of the same manta have close embeddings, while images of different mantas have distant embeddings.  
 There are then a number of options for actual classification:
@@ -98,28 +102,12 @@ def osnn_train(F_emb,F_labels,V_emb,V_labels,threshold_options):
             prediction = osnn_classify(F_emb,F_labels,inp,t)
             if(prediction == target): corrects = corrects + 1
         accuracies.append(corrects/total)
-    
+    print(accuracies)
     best_threshold = threshold_options[np.argmax(accuracies)]
     return best_threshold
 
 
 
-### OSNN using Iris dataset ###
-
-###Load Dataset###
-iris = pd.read_csv("iris.csv")
-features = iris[['a','b','c','d']].values
-labels = np.squeeze(iris[['id']].values)
-unique_labels = np.unique(labels) 
-
-###classification###
-train_embs = features[0:features.shape[0]-2]
-train_labels = labels[0:labels.shape[0]-2]
-x = features[features.shape[0]-1]
-y = labels[labels.shape[0]-1]
-pred = osnn_classify(train_embs,train_labels,x,1)
-print(pred)
-print(y)
 
 
 ###Create Sets F and V###
@@ -129,33 +117,73 @@ The training set is divided into a fitting set F that contains half of the insta
 """
 def create_sets(train_embs,train_labels):
     possible_labels = np.unique(train_labels)
-    V_embs = np.array([])
-    F_embs = np.array([])
     V_labels = []
     F_labels = []
+    V_embs = np.array([])
+    F_embs = np.array([])
     #we want half of classes to act as "known", and half as unknown
-    known_classes = random.sample(possible_labels,np.floor(possible_labels.shape[0] / 2)) #classes chosen as known
-    unknown_classes =  list(set(possible_labels)-set(known_labels)) #classes chosen as unknown
+    known_classes = list(random.sample(set(possible_labels),int(np.floor(possible_labels.shape[0] / 2)))) 
+    unknown_classes =  list(set(possible_labels)-set(known_classes))
     
     #V must contain all unknown instances, and half the known instances
     #F must contain half the known instances
     for i in range(train_embs.shape[0]):
-        if(train_labels[i] in unknown):
+        if(train_labels[i] in unknown_classes):
             V_labels.append("unknown")
-            V_embs = np.append(V_embs,train_embs[i])
+            if(V_embs.size == 0):
+                V_embs = np.array(train_embs[i])
+            else:
+                V_embs = np.vstack((V_embs,[train_embs[i]]))
         else: 
             #50/50 chance of adding to V or F
-            
-    
-    
-
+            if(random.sample(range(10),1)[0] > 5): #Add to V
+                V_labels.append(train_labels[i])
+                if(V_embs.size == 0):
+                    V_embs = np.array([train_embs[i]])
+                else:
+                    V_embs = np.vstack((V_embs,train_embs[i]))
+            else:# Add to F
+                F_labels.append(train_labels[i])
+                if(F_embs.size == 0):
+                    F_embs = np.array([train_embs[i]])
+                else:
+                    F_embs = np.vstack((F_embs,train_embs[i]))
 
     return(F_embs,F_labels,V_embs,V_labels)
 
 
 
+###Load Iris Dataset###
+iris = pd.read_csv("iris.csv")
+features = iris[['a','b','c','d']].values
+labels = np.squeeze(iris[['id']].values)
+unique_labels = np.unique(labels) 
 
+# ###classification###
+# train_embs = np.array(features[0:features.shape[0]-2])
+# train_labels = labels[0:labels.shape[0]-2]
+# x = np.array(features[features.shape[0]-1])
+# y = labels[labels.shape[0]-1]
+# pred = osnn_classify(train_embs,train_labels,x,0)
+# print(pred)
+# print(y)
 
+#train-test split
+train_size = int(np.floor(2/3 * features.shape[0]))
+test_size = int(features.shape[0] - train_size)
+train_features = np.array(features[0:train_size:1])
+train_labels = labels[0:train_size:]
+test_features = np.array(features[train_size:features.shape[0]])
+test_labels = labels[train_size:features.shape[0]] 
+
+#Create Sets F and V from the training set
+(F_embs,F_labels,V_embs,V_labels) = create_sets(train_features,train_labels)
+print(F_embs.shape)
+print(len(F_labels))
+print(V_embs.shape)
+print(len(V_labels))
+threshold = osnn_train(F_embs,F_labels,V_embs,V_labels,[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9])
+print(threshold)
 
 
 

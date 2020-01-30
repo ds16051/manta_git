@@ -9,6 +9,9 @@ from torch.utils.data import DataLoader
 import random
 import matplotlib.pyplot as plt
 
+#device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
+
+#IN THIS FILE ONLY: ALL ARRAYS TYPE OBJECTS SHOULD BE TENSORS, ASIDE FROM LABELS,WHICH ARE LISTS
 
 load_manta_dict_pt = True #set to true to load manta_dict from .pt file, set to false to construct manta_dict from manta_dataset, without loading a .pt file
 
@@ -130,13 +133,12 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
     average_triplet_loss = torch.mean(all_triplet_losses)
     return average_triplet_loss
 
+###Optimiser###
 learning_rate = 0.001
 weight_decay = 1e-5
-###Optimiser###
 optimiser= optim.Adam(params = model.parameters(),lr = learning_rate,weight_decay = weight_decay)
 
-
-epochs = 1
+epochs = 5
 train_losses = np.zeros(epochs)
 ###For Each Batch###
 #We treat a batch as an epoch
@@ -153,7 +155,7 @@ for epoch in range(0,epochs):
     ###Compute Loss On Batch ###
     loss = batch_hard_triplet_loss(batch_ids,embeddings,0.2)
     print(loss)
-    losses[epoch] = loss
+    train_losses[epoch] = loss
     loss.backward()
     print("backprop done")
     optimiser.step()
@@ -169,7 +171,7 @@ plt.savefig("figs/train_loss")
 
     
 
-###Next look at optimiser...###
+
 
 #to print an image
 #(transforms.ToPILImage()(image)).show()

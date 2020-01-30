@@ -10,13 +10,13 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 import random
 
-ar = np.array([])
-ar = np.append(ar,1)
-print(ar)
 
 
 
-
+ar = np.array([1,2])
+ar2 = np.array([3,4])
+res = np.vstack((ar,ar2))
+print(res)
 
 #e = torch.tensor([])
 #val1 = 1.0
