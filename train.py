@@ -13,44 +13,49 @@ import matplotlib.pyplot as plt
 
 #IN THIS FILE ONLY: ALL ARRAYS TYPE OBJECTS SHOULD BE TENSORS, ASIDE FROM LABELS,WHICH ARE LISTS
 
-load_manta_dict_pt = True #set to true to load manta_dict from .pt file, set to false to construct manta_dict from manta_dataset, without loading a .pt file
+###Outputting Image###
+#pass this a tensor to show as image
+def showImage(tensor_to_show):
+    (transforms.ToPILImage()(tensor_to_show)).show()
 
-####Define Model###
-model = models.inception_v3(pretrained = False, transform_input = False)
-model.fc = torch.nn.Linear(2048,128) # 128d latent space
-
-###Import Dataset###
+###Import/Generate Dataset###
 """
 datset is a list of dictionaries
 each dictionary corresponds to one image
 dataset[i]["image"] gives the ith image as torch.Tensor
 dataset[i]["label"] gives the ith image's label as a string
 """
-if(not load_manta_dict_pt):
-    manta_dataset = MantaDataset(json_file = "~/Documents/mastersProject/dataSetOne/mantaAnnotations.json", root_dir = "~/Documents/mastersProject/dataSetOne/")
+def generate_datasets(json_file,root_dir):
+    manta_dataset = MantaDataset(json_file,image_dir)
+    #Train/Test/Unknown Split
+    train_length = int(np.floor(0.8 * len(manta_dataset)))
+    test_length = int(np.floor(0.1 * len(manta_dataset)))
+    unknown_length = len(manta_dataset)-train_length-test_length
+    data_split = torch.utils.data.random_split(manta_dataset,[train_length,test_length,unknown_length])
+    training_dataset = data_split[0]
+    test_dataset = data_split[1]
+    unknown_dataset = data_split[2]
+    return(training_dataset,test_dataset,unknown_dataset)
+
 
 ###Construct/Load Dictionary###
 """
-construct a dictionary, mapping from label to a list of all torch.Tensor images for that label
-this dictionary is saved to dict
+construct a dictionary from provided dataset,mapping from label to a list of all torch.Tensor images for that label
+this dictionary is saved to file_to_save (which must end in ".pt")
 """
-if(not load_manta_dict_pt): #construct manta_dict from manta_dataset
-    manta_dict = {}
-    print(len(manta_dataset))
-    for i in range(len(manta_dataset)):
+def generate_dictionary(dataset,file_to_save):
+    dictionary = {}
+    print(len(dataset))
+    for i in range(len(dataset)):
         print(i)
-        label = manta_dataset[i]["label"]
-        image = manta_dataset[i]["image"]
-        if(label in manta_dict):
-            manta_dict[label].append(image)
+        label = dataset[i]["label"]
+        image = dataset[i]["image"]
+        if(label in dictionary):
+            dictionary[label].append(image)
         else:
-            manta_dict[label] = [image]
-
-    torch.save(manta_dict,"manta_dict.pt")
-    print("saved")
-else: #load manta_dict from pt file
-    manta_dict = torch.load("manta_dict.pt")
-    print("loaded")
+            dictionary[label] = [image]
+    torch.save(dictionary,file_to_save)
+    return dictionary
 
 
 ###Batch Selection###
@@ -58,21 +63,21 @@ else: #load manta_dict from pt file
 """
 we construct a batch by selecting p random identities, and then k images for each identity, giving batch size pk
 guideline values: p = 8, k = 4 for batch size 32
-this is done from manta_dict
+this is done from dictionary
 """
 #returns(images_batch,labels_batch);batch_labels is a (p*k)-long list;batch_images is a (p*k)* 3 * 299 * 299 tensor
-def batch_select(p,k): #select p individuals, k photos of each
+def batch_select(p,k,dictionary): #select p individuals, k photos of each, from the given dictionary
     batch_images = torch.tensor([])
     batch_labels = []
     
-    all_ids = list(manta_dict.keys()) #list of all ids, i.e a list of the keys of manta_dict
+    all_ids = list(dictionary.keys()) #list of all ids, i.e a list of the keys of dictionary
     rands = random.sample(range(len(all_ids)),p) #list of p chosen indices for all_ids
     chosen_ids = [all_ids[indice] for indice in rands] #list of p chosen individuals
     
     #for each chosen individual
     for i in range(len(chosen_ids)):
         _id = chosen_ids[i]
-        images_pool = manta_dict[_id] #list of all images of _id
+        images_pool = dictionary[_id] #list of all images of _id
         if(len(images_pool)<k): raise ValueError("k > available images of this individual")
         rands = random.sample(range(len(images_pool)),k) #list of k chosen indices for images_pool
         #for each chosen image of chosen individual
@@ -134,46 +139,79 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
     average_triplet_loss = torch.mean(all_triplet_losses)
     return average_triplet_loss
 
+###################################################################################################################
+###################################################################################################################
+###################################################################################################################
+
+is_generate_dictionaries = True #True to generate dictionaries;;False to load dictionaries from .pt files 
+is_train_net = True#True to train network and save weights,False to load network from .pt file
+json_file = "mantaAnnotations.json" 
+#image_dir = "small_image_set/" #laptop
+image_dir = "scratch/small_image_set/" #bc4
+
+###Generate Datasets### 
+if(is_generate_dictionaries):
+    (train_dataset,test_dataset,unknown_dataset) = generate_datasets(json_file,image_dir)
+    
+###Generating Dictionaries###
+if(is_generate_dictionaries):
+    train_dict = generate_dictionary(train_dataset,"train_dict.pt")
+    test_dict = generate_dictionary(test_dataset,"test_dict.pt")
+    unknown_dict = generate_dictionary(unknown_dataset,"unknown_dict.pt")
+
+###Loading Dictionaries###
+if(not is_generate_dictionaries):
+    train_dict = torch.load("train_dict.pt")
+    test_dict = torch.load("test_dict.pt")
+    unknown_dict = torch.load("unknown_dict.pt")
+
+####Model###
+model = models.inception_v3(pretrained = False, transform_input = False)
+model.fc = torch.nn.Linear(2048,128) # 128d latent space
+
 ###Optimiser###
 learning_rate = 0.001
 weight_decay = 1e-5
 optimiser= optim.Adam(params = model.parameters(),lr = learning_rate,weight_decay = weight_decay)
 
+###Training Loop OR Loading Weights###
 epochs = 5
-train_losses = np.zeros(epochs)
-###For Each Batch###
-#We treat a batch as an epoch
-for epoch in range(0,epochs):
-    #Select Batch
-    batch = batch_select(p=8,k=4) #randomly selects a size 32 batch
-    batch_ims = batch[0] 
-    batch_ids = batch[1]
+if(is_train_net):
+    train_losses = np.zeros(epochs)
+    ###For Each Batch###
+    #We treat a batch as an epoch
+    for epoch in range(0,epochs):
+        #Select Batch
+        batch = batch_select(p=8,k=4,train_dict) #randomly selects a size 8*4=32 batch
+        batch_ims = batch[0] 
+        batch_ids = batch[1]
 
-    ###Compute Embeddings On Batch###
-    embeddings = model(batch_ims)[0] #extremely slow, but verified this is 32 * 128, as expected
-    #embeddings = torch.randn(32,128) #use this for now for speed
+        ###Compute Embeddings On Batch###
+        embeddings = model(batch_ims)[0] #32 * 128
+        
+        ###Compute Loss On Batch ###
+        loss = batch_hard_triplet_loss(batch_ids,embeddings,0.2)
+        train_losses[epoch] = loss
+        loss.backward()
+        optimiser.step()
+        optimiser.zero_grad()
     
-    ###Compute Loss On Batch ###
-    loss = batch_hard_triplet_loss(batch_ids,embeddings,0.2)
-    print(loss)
-    train_losses[epoch] = loss
-    loss.backward()
-    print("backprop done")
-    optimiser.step()
-    optimiser.zero_grad()
-    print("optimiser done")
+    ###Save Model###
+    torch.save(model.state_dict(),"network_weights.pt")
+    
+    ###Plotting###
+    plt.plot(train_losses)
+    plt.savefig("figs/train_loss")
+
+if(not is_train_net):
+    ###Load Saved Weights###
+    model.load_state_dict(torch.load("network_weights.pt"))
+
+
+
+#json_file = "~/Documents/mastersProject/dataSetOne/mantaAnnotations.json" 
+#image_dir = "~/Documents/mastersProject/dataSetOne/"
     
 
-#print("1 epoch complete")
-
-#plot losses
-plt.plot(train_losses)
-plt.savefig("figs/train_loss")
-
-    
 
 
-
-#to print an image
-#(transforms.ToPILImage()(image)).show()
-#[row][column]

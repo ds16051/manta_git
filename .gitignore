@@ -10,3 +10,7 @@ __pycache__/dataset.cpython-37.pyc
 figs/train_loss.png
 
 bc4-summary.rtf
+
+small_image_set/
+
+__pycache__/
