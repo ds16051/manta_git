@@ -26,7 +26,8 @@ each dictionary corresponds to one image
 dataset[i]["image"] gives the ith image as torch.Tensor
 dataset[i]["label"] gives the ith image's label as a string
 """
-manta_dataset = MantaDataset(json_file = "~/Documents/mastersProject/dataSetOne/mantaAnnotations.json", root_dir = "~/Documents/mastersProject/dataSetOne/")
+if(not load_manta_dict_pt):
+    manta_dataset = MantaDataset(json_file = "~/Documents/mastersProject/dataSetOne/mantaAnnotations.json", root_dir = "~/Documents/mastersProject/dataSetOne/")
 
 ###Construct/Load Dictionary###
 """
@@ -163,7 +164,7 @@ for epoch in range(0,epochs):
     print("optimiser done")
     
 
-print("1 epoch complete")
+#print("1 epoch complete")
 
 #plot losses
 plt.plot(train_losses)

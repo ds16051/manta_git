@@ -9,14 +9,13 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 import random
+import matplotlib.pyplot as plt
+
+loss = [1,2,3,4,8]
+plt.plot(loss)
+plt.savefig("figs/loss")
 
 
-
-
-ar = np.array([1,2])
-ar2 = np.array([3,4])
-res = np.vstack((ar,ar2))
-print(res)
 
 #e = torch.tensor([])
 #val1 = 1.0

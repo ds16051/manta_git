@@ -2,3 +2,11 @@
 manta_dict.pt
 
 mantaAnnotations.json
+
+.~lock.bc4-summary.rtf#
+
+__pycache__/dataset.cpython-37.pyc
+
+figs/train_loss.png
+
+bc4-summary.rtf

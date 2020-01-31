@@ -52,7 +52,7 @@ class MantaDataset(Dataset):
 #maybe can use this as a basis from which to generate triplets for training
 
 
-dataset = MantaDataset(json_file = "~/Documents/mastersProject/dataSetOne/mantaAnnotations.json", root_dir = "~/Documents/mastersProject/dataSetOne/")
+#dataset = MantaDataset(json_file = "~/Documents/mastersProject/dataSetOne/mantaAnnotations.json", root_dir = "~/Documents/mastersProject/dataSetOne/")
 
 
 """
