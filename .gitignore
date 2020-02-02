@@ -14,3 +14,7 @@ bc4-summary.rtf
 small_image_set/
 
 __pycache__/
+
+*.pt
+
+*.pyc

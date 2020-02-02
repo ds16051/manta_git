@@ -45,9 +45,9 @@ this dictionary is saved to file_to_save (which must end in ".pt")
 """
 def generate_dictionary(dataset,file_to_save):
     dictionary = {}
-    print(len(dataset))
+    #print(len(dataset))
     for i in range(len(dataset)):
-        print(i)
+        #print(i)
         label = dataset[i]["label"]
         image = dataset[i]["image"]
         if(label in dictionary):
@@ -143,15 +143,15 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
 ###################################################################################################################
 ###################################################################################################################
 
-is_generate_dictionaries = True #True to generate dictionaries;;False to load dictionaries from .pt files 
-is_train_net = True#True to train network and save weights,False to load network from .pt file
+is_generate_dictionaries = False #True to generate dictionaries;;False to load dictionaries from .pt files 
+is_train_net = False #True to train network and save weights,False to load network from .pt file
 json_file = "mantaAnnotations.json" 
-#image_dir = "small_image_set/" #laptop
-image_dir = "scratch/small_image_set/" #bc4
+image_dir = "scratch/small_image_set/"
 
 ###Generate Datasets### 
 if(is_generate_dictionaries):
     (train_dataset,test_dataset,unknown_dataset) = generate_datasets(json_file,image_dir)
+
     
 ###Generating Dictionaries###
 if(is_generate_dictionaries):
@@ -164,6 +164,7 @@ if(not is_generate_dictionaries):
     train_dict = torch.load("train_dict.pt")
     test_dict = torch.load("test_dict.pt")
     unknown_dict = torch.load("unknown_dict.pt")
+    print("dictionaries loaded")
 
 ####Model###
 model = models.inception_v3(pretrained = False, transform_input = False)
@@ -182,12 +183,12 @@ if(is_train_net):
     #We treat a batch as an epoch
     for epoch in range(0,epochs):
         #Select Batch
-        batch = batch_select(p=8,k=4,train_dict) #randomly selects a size 8*4=32 batch
+        batch = batch_select(p=8,k=4,dictionary =train_dict) #randomly selects a size 8*4=32 batch
         batch_ims = batch[0] 
         batch_ids = batch[1]
 
         ###Compute Embeddings On Batch###
-        embeddings = model(batch_ims)[0] #32 * 128
+        embeddings = model(batch_ims)[0] #32 * 128, the [0] is because inception net also gives an auxiliary output during training, but not during evaluation.
         
         ###Compute Loss On Batch ###
         loss = batch_hard_triplet_loss(batch_ids,embeddings,0.2)
@@ -201,16 +202,23 @@ if(is_train_net):
     
     ###Plotting###
     plt.plot(train_losses)
-    plt.savefig("figs/train_loss")
+    plt.savefig("train_loss.png")
 
 if(not is_train_net):
     ###Load Saved Weights###
     model.load_state_dict(torch.load("network_weights.pt"))
+    print("model loaded")
+
+###Evaluation###
+#For evaluation we should be using test_dict and unkown_dict, not the original datasets
+model.eval()
+test_keys = list(test_dict.keys())
+output = model(torch.unsqueeze(test_dict[test_keys[0]][0],dim=0))
 
 
 
-#json_file = "~/Documents/mastersProject/dataSetOne/mantaAnnotations.json" 
-#image_dir = "~/Documents/mastersProject/dataSetOne/"
+
+
     
 
 
