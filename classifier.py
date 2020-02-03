@@ -53,7 +53,7 @@ def osnn_classify(train_embs, train_labels, in_emb, threshold = 0.5):
     #compute list of distances from in_emb to each of train_embs
     distances = np.zeros(train_embs.shape[0])
     for i in range(train_embs.shape[0]):
-        distances[i] = np.linalg.norm(in_emb - features[i])
+        distances[i] = np.linalg.norm(in_emb - train_embs[i])
     
     #find closest embedding to in_emb (called t)
     t_index = np.argmin(distances)
@@ -102,7 +102,7 @@ def osnn_train(F_emb,F_labels,V_emb,V_labels,threshold_options):
             prediction = osnn_classify(F_emb,F_labels,inp,t)
             if(prediction == target): corrects = corrects + 1
         accuracies.append(corrects/total)
-    print(accuracies)
+    #print(accuracies)
     best_threshold = threshold_options[np.argmax(accuracies)]
     return best_threshold
 
@@ -153,37 +153,37 @@ def create_sets(train_embs,train_labels):
 
 
 
-###Load Iris Dataset###
-iris = pd.read_csv("iris.csv")
-features = iris[['a','b','c','d']].values
-labels = np.squeeze(iris[['id']].values)
-unique_labels = np.unique(labels) 
+# ###Load Iris Dataset###
+# iris = pd.read_csv("iris.csv")
+# features = iris[['a','b','c','d']].values
+# labels = np.squeeze(iris[['id']].values)
+# unique_labels = np.unique(labels) 
 
-# ###classification###
-# train_embs = np.array(features[0:features.shape[0]-2])
-# train_labels = labels[0:labels.shape[0]-2]
-# x = np.array(features[features.shape[0]-1])
-# y = labels[labels.shape[0]-1]
-# pred = osnn_classify(train_embs,train_labels,x,0)
-# print(pred)
-# print(y)
+# # ###classification###
+# # train_embs = np.array(features[0:features.shape[0]-2])
+# # train_labels = labels[0:labels.shape[0]-2]
+# # x = np.array(features[features.shape[0]-1])
+# # y = labels[labels.shape[0]-1]
+# # pred = osnn_classify(train_embs,train_labels,x,0)
+# # print(pred)
+# # print(y)
 
-#train-test split
-train_size = int(np.floor(2/3 * features.shape[0]))
-test_size = int(features.shape[0] - train_size)
-train_features = np.array(features[0:train_size:1])
-train_labels = labels[0:train_size:]
-test_features = np.array(features[train_size:features.shape[0]])
-test_labels = labels[train_size:features.shape[0]] 
+# #train-test split
+# train_size = int(np.floor(2/3 * features.shape[0]))
+# test_size = int(features.shape[0] - train_size)
+# train_features = np.array(features[0:train_size:1])
+# train_labels = labels[0:train_size:]
+# test_features = np.array(features[train_size:features.shape[0]])
+# test_labels = labels[train_size:features.shape[0]] 
 
-#Create Sets F and V from the training set
-(F_embs,F_labels,V_embs,V_labels) = create_sets(train_features,train_labels)
-print(F_embs.shape)
-print(len(F_labels))
-print(V_embs.shape)
-print(len(V_labels))
-threshold = osnn_train(F_embs,F_labels,V_embs,V_labels,[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9])
-print(threshold)
+# #Create Sets F and V from the training set
+# (F_embs,F_labels,V_embs,V_labels) = create_sets(train_features,train_labels)
+# #print(F_embs.shape)
+# #print(len(F_labels))
+# #print(V_embs.shape)
+# #print(len(V_labels))
+# threshold = osnn_train(F_embs,F_labels,V_embs,V_labels,[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9])
+# #print(threshold)
 
 
 
