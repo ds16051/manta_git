@@ -8,6 +8,7 @@ from dataset import MantaDataset
 from torch.utils.data import DataLoader
 import random
 import matplotlib.pyplot as plt
+#import classifier
 
 #device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
@@ -18,44 +19,61 @@ import matplotlib.pyplot as plt
 def showImage(tensor_to_show):
     (transforms.ToPILImage()(tensor_to_show)).show()
 
-###Import/Generate Dataset###
+###Generate Dataset###
 """
 datset is a list of dictionaries
 each dictionary corresponds to one image
 dataset[i]["image"] gives the ith image as torch.Tensor
 dataset[i]["label"] gives the ith image's label as a string
 """
-def generate_datasets(json_file,root_dir):
-    manta_dataset = MantaDataset(json_file,image_dir)
-    #Train/Test/Unknown Split
-    train_length = int(np.floor(0.8 * len(manta_dataset)))
-    test_length = int(np.floor(0.1 * len(manta_dataset)))
-    unknown_length = len(manta_dataset)-train_length-test_length
-    data_split = torch.utils.data.random_split(manta_dataset,[train_length,test_length,unknown_length])
-    training_dataset = data_split[0]
-    test_dataset = data_split[1]
-    unknown_dataset = data_split[2]
-    return(training_dataset,test_dataset,unknown_dataset)
-
+def generate_dataset(json_file,image_dir):
+    dataset = MantaDataset(json_file,image_dir)
+    return dataset
 
 ###Construct/Load Dictionary###
 """
-construct a dictionary from provided dataset,mapping from label to a list of all torch.Tensor images for that label
-this dictionary is saved to file_to_save (which must end in ".pt")
+In this function we choose 5% of the identities to act as unknown. All images for these classes are returned in the list unknown_list.
+Then for each of the remaining ids, 80% of the images for that id are used in train_dict, and the other 20% are used in test_dict.
+The keys for train_dict and test_dict are the same. Keys are ids, and they map to images for that id.
 """
-def generate_dictionary(dataset,file_to_save):
-    dictionary = {}
-    #print(len(dataset))
+def generate_save_dictionaries(dataset):
+    #Construct dictionary of whole dataset, mapping from id to list of images for that id
+    whole_dictionary = {}
     for i in range(len(dataset)):
-        #print(i)
         label = dataset[i]["label"]
         image = dataset[i]["image"]
-        if(label in dictionary):
-            dictionary[label].append(image)
+        if(label in whole_dictionary):
+            whole_dictionary[label].append(image)
         else:
-            dictionary[label] = [image]
-    torch.save(dictionary,file_to_save)
-    return dictionary
+            whole_dictionary[label] = [image]
+
+    all_ids = list(whole_dictionary.keys())
+    num_unknown_ids = int(np.ceil(0.05 * len(all_ids))) 
+    unknown_ids = all_ids[0:num_unknown_ids] #5% of classes are selected to act as unseen
+    known_ids = all_ids[num_unknown_ids:len(all_ids)] 
+
+    ###Make List Of Unknown Images###
+    unknown_list = []
+    for i in range(len(unknown_ids)):
+        current_images = whole_dictionary[unknown_ids[i]]
+        for j in range(len(current_images)):
+            unknown_list.append(current_images[j])
+
+    ###Make Train and Test Dictionaries###
+    train_dict = {}
+    test_dict = {}
+    for i in range(len(known_ids)):
+        current_id = known_ids[i]
+        current_images = whole_dictionary[current_id]
+        num_train = int(np.floor(0.8 * len(current_images)))
+        train_dict[current_id] = current_images[0:num_train]
+        test_dict[current_id] = current_images[num_train:len(current_images)]
+    
+    torch.save(unknown_list,"unknown_list.pt")
+    torch.save(train_dict,"train_dict.pt")
+    torch.save(test_dict,"test_dict.pt")
+    print("generated dicts")
+    return(train_dict,test_dict,unknown_list)
 
 
 ###Batch Selection###
@@ -101,8 +119,6 @@ def pairwise_distances(embeddings):
             if i == j: distance_matrix[i][j] = -1
     return distance_matrix
 
-#pairwise_distances = pairwise_distances(embeddings)
-#print(pairwise_distances)
 
 ###Compute Batch-Hard Triplet Loss On Embeddings###
 """
@@ -139,6 +155,64 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
     average_triplet_loss = torch.mean(all_triplet_losses)
     return average_triplet_loss
 
+
+###Evaluation###
+#For evaluation we should be using train_dict, test_dict, and unknown_list, not the original dataset
+#We will calculate the metrics test_accuracy and open_set_accuracy
+"""
+    1.) Calculate and store embeddings and ids for train set, test set and unknown set
+    2.) Classify the test and unknown embeddings using OSNN, with the train embeddings as the training set.
+"""
+def evaluation(train_dict,test_dict,unknown_list,model):
+    model.eval()
+    train_embeddings = []
+    train_ids = []
+    test_embeddings = []
+    test_ids = []
+    unknown_embeddings = []
+    train_test_keys = list(train_dict.keys())
+    
+    #calculate train_embeddings
+    for i in range(len(train_test_keys)):
+        key = train_test_keys[i]
+        images = train_dict[key]
+        for j in range(len(images)):
+            image = torch.unsqueeze(images[j],dim=0)
+            embedding = model(image)
+            train_embeddings.append(embedding)
+            train_ids.append(key)
+    
+    #calculate test_embeddings
+    for i in range(len(train_test_keys)):
+        key = train_test_keys[i]
+        images = test_dict[key]
+        for j in range(len(images)):
+            image = torch.unsqueeze(images[j],dim=0)
+            embedding = model(image)
+            test_embeddings.append(embedding)
+            test_ids.append(key)
+    
+    #calculate unknown_embeddings
+    for i in range(len(unknown_list)):
+        image = torch.unsqueeze(unknown_list[i],dim=0)
+        embedding = model(image)
+        unknown_embeddings.append(embedding)
+    
+    return(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings)
+
+###Classification###
+"""
+For classification we use OSNN.
+First we use the embeddings of the training set to find a threshold
+Then we use the training embeddings and this threshold to classify test and unknown embeddings.
+"""
+def osnn_threshold(train_embeddings,train_ids):
+    threshold = 0
+    return threshold
+
+    
+
+
 ###################################################################################################################
 ###################################################################################################################
 ###################################################################################################################
@@ -148,22 +222,20 @@ is_train_net = False #True to train network and save weights,False to load netwo
 json_file = "mantaAnnotations.json" 
 image_dir = "scratch/small_image_set/"
 
-###Generate Datasets### 
+###Generate Dataset### 
 if(is_generate_dictionaries):
-    (train_dataset,test_dataset,unknown_dataset) = generate_datasets(json_file,image_dir)
-
+    dataset = generate_dataset(json_file,image_dir)
     
-###Generating Dictionaries###
+###Generate and Save Dictionaries###
 if(is_generate_dictionaries):
-    train_dict = generate_dictionary(train_dataset,"train_dict.pt")
-    test_dict = generate_dictionary(test_dataset,"test_dict.pt")
-    unknown_dict = generate_dictionary(unknown_dataset,"unknown_dict.pt")
+    (train_dict,test_dict,unknown_list) = generate_save_dictionaries(dataset)
+    
 
-###Loading Dictionaries###
+###Load Dictionaries###
 if(not is_generate_dictionaries):
     train_dict = torch.load("train_dict.pt")
     test_dict = torch.load("test_dict.pt")
-    unknown_dict = torch.load("unknown_dict.pt")
+    unknown_list = torch.load("unknown_list.pt")
     print("dictionaries loaded")
 
 ####Model###
@@ -177,13 +249,14 @@ optimiser= optim.Adam(params = model.parameters(),lr = learning_rate,weight_deca
 
 ###Training Loop OR Loading Weights###
 epochs = 5
+batches_per_test_step = 1 #how many batches to train on before testing
 if(is_train_net):
     train_losses = np.zeros(epochs)
     ###For Each Batch###
     #We treat a batch as an epoch
     for epoch in range(0,epochs):
         #Select Batch
-        batch = batch_select(p=8,k=4,dictionary =train_dict) #randomly selects a size 8*4=32 batch
+        batch = batch_select(p=8,k=4,dictionary = train_dict) #randomly selects a size 8*4=32 batch
         batch_ims = batch[0] 
         batch_ids = batch[1]
 
@@ -209,11 +282,22 @@ if(not is_train_net):
     model.load_state_dict(torch.load("network_weights.pt"))
     print("model loaded")
 
-###Evaluation###
-#For evaluation we should be using test_dict and unkown_dict, not the original datasets
-model.eval()
-test_keys = list(test_dict.keys())
-output = model(torch.unsqueeze(test_dict[test_keys[0]][0],dim=0))
+
+print(len(unknown_list))
+showImage(unknown_list[0])
+
+#Calculate Test/Train/Unknown Embeddings Using Provided Model
+#(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings) = evaluation(train_dict,test_dict,unknown_list,model)
+
+
+
+
+
+
+
+
+
+
 
 
 
