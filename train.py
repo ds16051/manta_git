@@ -10,6 +10,11 @@ import random
 import matplotlib.pyplot as plt
 import classifier
 
+#empty log file
+f = open('log.txt', 'r+')
+f.truncate(0)
+f.close()
+
 #device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
 #IN THIS FILE ONLY: ALL ARRAYS TYPE OBJECTS SHOULD BE TENSORS, ASIDE FROM LABELS,WHICH ARE LISTS
@@ -19,14 +24,12 @@ import classifier
 def showImage(tensor_to_show):
     (transforms.ToPILImage()(tensor_to_show)).show()
 
+def file_write(out):
+    text_file = open("log.txt", "a+")
+    text_file.write(str(out))
+    text_file.write("\n")
+    text_file.close()
 
-####Neater encapsulation of OSNN threshold from classifier.py###
-#Calculate threshold for OSNN based on training set
-def osnn_threshold(train_embeddings,train_ids):
-    (F_embs,F_labels,V_embs,V_labels) = classifier.create_sets(train_embeddings,train_ids)
-    threshold_options = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
-    threshold = classifier.osnn_train(F_embs,F_labels,V_embs,V_labels,threshold_options)
-    return threshold
 
 ###Generate Dataset###
 """
@@ -81,7 +84,6 @@ def generate_save_dictionaries(dataset):
     torch.save(unknown_list,"unknown_list.pt")
     torch.save(train_dict,"train_dict.pt")
     torch.save(test_dict,"test_dict.pt")
-    print("generated dicts")
     return(train_dict,test_dict,unknown_list)
 
 
@@ -174,88 +176,99 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
 """
 ###Calculate embeddings
 def embeddings(train_dict,test_dict,unknown_list,model):
-    model.eval()
-    train_embeddings = []
-    train_ids = []
-    test_embeddings = []
-    test_ids = []
-    unknown_embeddings = []
-    train_test_keys = list(train_dict.keys())
-    
-    #calculate train_embeddings
-    for i in range(len(train_test_keys)):
-        key = train_test_keys[i]
-        images = train_dict[key]
-        for j in range(len(images)):
-            image = torch.unsqueeze(images[j],dim=0)
-            embedding = model(image)
-            train_embeddings.append(embedding)
-            train_ids.append(key)
-    
-    torch.save(train_embeddings,"train_embeddings.pt")
-    torch.save(train_ids,"train_ids.pt")
-    print("train embedding done")
-    
-    #calculate test_embeddings
-    for i in range(len(train_test_keys)):
-        key = train_test_keys[i]
-        images = test_dict[key]
-        for j in range(len(images)):
-            image = torch.unsqueeze(images[j],dim=0)
-            embedding = model(image)
-            test_embeddings.append(embedding)
-            test_ids.append(key)
-    
-    torch.save(test_embeddings,"test_embeddings.pt")
-    torch.save(test_ids,"test_ids.pt")
-    print("test embedding done")
+    with torch.no_grad():
+        file_write("started function")
+        model.eval()
+        train_embeddings = []
+        train_ids = []
+        test_embeddings = []
+        test_ids = []
+        unknown_embeddings = []
+        train_test_keys = list(train_dict.keys())
+        
+        
+        #calculate train_embeddings
+        #for each identity
+        for i in range(len(train_test_keys)):
+            file_write(i)
+            key = train_test_keys[i]
+            images = train_dict[key]
+            #for each image of this identity
+            for j in range(len(images)):
+                image = torch.unsqueeze(images[j],dim=0)
+                embedding = model(image)
+                train_embeddings.append(embedding)
+                train_ids.append(key)
+        file_write("train embeddings done")
+        #torch.save(train_embeddings,"train_embeddings.pt")
+        #torch.save(train_ids,"train_ids.pt")
+        
+        # #calculate test_embeddings
+        for i in range(len(train_test_keys)):
+            file_write(i)
+            key = train_test_keys[i]
+            images = test_dict[key]
+            for j in range(len(images)):
+                image = torch.unsqueeze(images[j],dim=0)
+                embedding = model(image)
+                test_embeddings.append(embedding)
+                test_ids.append(key)
+        
+        # torch.save(test_embeddings,"test_embeddings.pt")
+        # torch.save(test_ids,"test_ids.pt")
+        file_write("test embedding done")
 
-    #calculate unknown_embeddings
-    for i in range(len(unknown_list)):
-        image = torch.unsqueeze(unknown_list[i],dim=0)
-        embedding = model(image)
-        unknown_embeddings.append(embedding)
-    
-    torch.save(unknown_embeddings,"unknown_embeddings.pt")
-    print("unknown embedding done")
-    
-    return(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings)
+        # #calculate unknown_embeddings
+        for i in range(len(unknown_list)):
+            file_write(i)
+            image = torch.unsqueeze(unknown_list[i],dim=0)
+            embedding = model(image)
+            unknown_embeddings.append(embedding)
+        
+        # torch.save(unknown_embeddings,"unknown_embeddings.pt")
+        file_write("unknown embedding done")
+        
+        return(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings)
 
 #Calculate test and unknown accuracies, given the dictionaries, and a trained model
 def accuracy(train_dict,test_dict,unknown_list,model):
-    model.eval()
-    #1) Caclulate embeddings from provided model
-    (train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings) = embeddings(train_dict,test_dict,unknown_list,model)
-    print("calculated embeddings")
-    #2) Calculate OSNN threshold from training embeddings
-    threshold = osnn_threshold(train_embeddings,train_ids)
-    print("calculated threshold")
-    #3) Calculate accuracy on test set
-    correct = float(0)
-    total = float(0)
-    for i in range(len(test_embeddings)):
-        prediction = classifier.osnn_classify(train_embeddings,train_ids,test_embeddings[i],threshold)
-        target = test_ids[i]
-        if(prediction == target): correct = correct + 1
-        total = total + 1
-    print("test correct",correct)
-    test_accuracy = float(100) * (correct/total)
-    #4) Caclulate accuracy on unknown set
-    correct = float(0)
-    total = float(0)
-    for i in range(len(unknown_embeddings)):
-        prediction = classifier.osnn_classify(train_embeddings,train_ids,unknown_embeddings[i],threshold)
-        if(prediction == "unknown"): correct = correct + 1
-        total = total + 1
-    unknown_accuracy = float(100) * (correct/total)
+    with torch.no_grad():
+        model.eval()
+        #1) Caclulate embeddings from provided model
+        (train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings) = embeddings(train_dict,test_dict,unknown_list,model)
+        file_write("calculated embeddings")
+        #2) Calculate OSNN threshold from training embeddings
+        threshold = classifier.osnn_threshold(train_embeddings,train_ids)
+        file_write("calculated threshold")
+        #3) Calculate accuracy on test set
+        correct = float(0)
+        total = float(0)
+        for i in range(len(test_embeddings)):
+            prediction = classifier.osnn_classify(train_embeddings,train_ids,test_embeddings[i],threshold)
+            target = test_ids[i]
+            if(prediction == target): correct = correct + 1
+            total = total + 1
+        test_accuracy = float(100) * (correct/total)
+        file_write("test accuracy calculated")
+        file_write(test_accuracy)
+        #4) Caclulate accuracy on unknown set
+        correct = float(0)
+        total = float(0)
+        for i in range(len(unknown_embeddings)):
+            prediction = classifier.osnn_classify(train_embeddings,train_ids,unknown_embeddings[i],threshold)
+            if(prediction == "unknown"): correct = correct + 1
+            total = total + 1
+        unknown_accuracy = float(100) * (correct/total)
+        file_write("unknown accuracy caclulated")
+        file_write(unknown_accuracy)
 
-    return(test_accuracy,unknown_accuracy)
+        return(test_accuracy,unknown_accuracy)
 
 
 ###################################################################################################################
 #################################################----MAIN----######################################################
 ###################################################################################################################
-
+file_write("main")
 is_generate_dictionaries = False #True to generate dictionaries;;False to load dictionaries from .pt files 
 is_train_net = False #True to train network and save weights,False to load network from .pt file
 json_file = "mantaAnnotations.json" 
@@ -275,7 +288,7 @@ if(not is_generate_dictionaries):
     train_dict = torch.load("train_dict.pt")
     test_dict = torch.load("test_dict.pt")
     unknown_list = torch.load("unknown_list.pt")
-    print("dictionaries loaded")
+    file_write("dictionaries loaded")
 
 ####Model###
 model = models.inception_v3(pretrained = False, transform_input = False)
@@ -320,13 +333,10 @@ if(is_train_net):
 if(not is_train_net):
     ###Load Saved Weights###
     model.load_state_dict(torch.load("network_weights.pt"))
-    print("model loaded")
+    file_write("model loaded")
 
 #Evaluate accuracy of model,
-print("called accuracy function")
 (test_accuracy,unknown_accuracy) = accuracy(train_dict,test_dict,unknown_list,model)
-print("test accuracy",test_accuracy)
-print("unknown accuracy",unknown_accuracy)
 
 
 
@@ -344,7 +354,7 @@ print("unknown accuracy",unknown_accuracy)
 
 
 
-    
+
 
 
 
