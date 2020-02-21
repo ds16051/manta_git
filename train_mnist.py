@@ -1,6 +1,7 @@
 import torch
 from torch import nn, optim
 import numpy as np
+import torchvision
 import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
@@ -16,7 +17,7 @@ import os
 import gzip
 
 #empty log file
-f = open('log.txt', 'r+')
+f = open('log_mn.txt', 'r+')
 f.truncate(0)
 f.close()
 
@@ -30,7 +31,7 @@ def showImage(tensor_to_show):
     (transforms.ToPILImage()(tensor_to_show)).show()
 
 def file_write(out):
-    text_file = open("log.txt", "a+")
+    text_file = open("log_mn.txt", "a+")
     text_file.write(str(out))
     text_file.write("\n")
     text_file.close()
@@ -47,6 +48,51 @@ def generate_dataset(json_file,image_dir):
     dataset = MantaDataset(json_file,image_dir)
     return dataset
 
+def generate_mnist_dataset():
+    with torch.no_grad():
+        orig_dataset = torchvision.datasets.MNIST(root = "./scratch",train = True,download=True,transform=transforms.Compose([transforms.Resize(size = (299,299)),transforms.ToTensor(),transforms.Lambda(lambda x: x.repeat(3, 1, 1) )]))
+        dataset = []
+        file_write(len(orig_dataset))
+        for i in range(50000):
+            file_write(i)
+            dic = {}
+            dic["image"] = orig_dataset[i][0]
+            dic["label"] = orig_dataset[i][1]
+            dataset.append(dic)
+        file_write("finished mnist dataset")
+        return dataset
+
+#immediately generate dictionaries, with keys 0-9 each mapping to k examples
+def generate_rmnist(k):
+    with torch.no_grad():
+        dataset = torchvision.datasets.MNIST(root = "./scratch",train = True,download=True,transform=transforms.Compose([transforms.Resize(size = (299,299)),transforms.ToTensor(),transforms.Lambda(lambda x: x.repeat(3, 1, 1) )]))
+
+        #initialise dictionary
+        dictionary = {}
+        for n in range(0,10):
+            dictionary[str(n)] = []
+        #construct large dictionary, which will be split into train/test after
+        for n in range(0,10):
+            #print(n)
+            count = 0
+            index = 0
+            while count<(2*k):
+                if(dataset[index][1] == n):
+                    dictionary[str(n)].append(dataset[index][0])
+                    count = count + 1
+                    #print(count)
+                index = index + 1
+
+        train_dict = {}
+        test_dict = {}
+        for n in range(0,10):
+            train_dict[str(n)] = dictionary[str(n)][0:k]
+            test_dict[str(n)] = dictionary[str(n)][k:2*k]
+        
+        unknown_list = [dataset[0][0]]
+        
+        return(train_dict,test_dict,unknown_list)
+
 
 
 ###Construct/Load Dictionary###
@@ -58,8 +104,7 @@ The keys for train_dict and test_dict are the same. Keys are ids, and they map t
 def generate_save_dictionaries(dataset):
     #Construct dictionary of whole dataset, mapping from id to list of images for that id
     whole_dictionary = {}
-    #for i in range(len(dataset)):
-    for i in range(100):
+    for i in range(len(dataset)):
         label = dataset[i]["label"]
         image = dataset[i]["image"]
         if(label in whole_dictionary):
@@ -89,11 +134,10 @@ def generate_save_dictionaries(dataset):
         train_dict[current_id] = current_images[0:num_train]
         test_dict[current_id] = current_images[num_train:len(current_images)]
     
-    torch.save(unknown_list,"unknown_list_mini.pt")
-    torch.save(train_dict,"train_dict_mini.pt")
-    torch.save(test_dict,"test_dict_mini.pt")
+    torch.save(unknown_list,"unknown_list_mn.pt")
+    torch.save(train_dict,"train_dict_mn.pt")
+    torch.save(test_dict,"test_dict_mn.pt")
     return(train_dict,test_dict,unknown_list)
-
 
 ###Batch Selection###
 #NOTE: There are 10 images of each id
@@ -208,8 +252,8 @@ def calculate_embeddings(train_dict,test_dict,unknown_list,model):
                 train_embeddings.append(embedding)
                 train_ids.append(key)
         file_write("train embeddings done")
-        #torch.save(train_embeddings,"train_embeddings_mini.pt")
-        #torch.save(train_ids,"train_ids_mini.pt")
+        #torch.save(train_embeddings,"train_embeddings_mn.pt")
+        #torch.save(train_ids,"train_ids_mn.pt")
         
         # #calculate test_embeddings
         for i in range(len(train_test_keys)):
@@ -222,8 +266,8 @@ def calculate_embeddings(train_dict,test_dict,unknown_list,model):
                 test_embeddings.append(embedding)
                 test_ids.append(key)
         
-        # torch.save(test_embeddings,"test_embeddings_mini.pt")
-        # torch.save(test_ids,"test_ids_mini.pt")
+        # torch.save(test_embeddings,"test_embeddings_mn.pt")
+        # torch.save(test_ids,"test_ids_mn.pt")
         file_write("test embedding done")
 
         # #calculate unknown_embeddings
@@ -233,7 +277,7 @@ def calculate_embeddings(train_dict,test_dict,unknown_list,model):
             embedding = model(image)
             unknown_embeddings.append(embedding)
         
-        # torch.save(unknown_embeddings,"unknown_embeddings_mini.pt")
+        # torch.save(unknown_embeddings,"unknown_embeddings_mn.pt")
         file_write("unknown embedding done")
         
         return(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings)
@@ -296,7 +340,6 @@ def accuracy_nn(train_dict,test_dict,unknown_list,model):
         file_write(test_accuracy)
         return test_accuracy
 
-#simple nn accuracy  with topk
 def accuracy_nn_topk(train_dict,test_dict,unknown_list,model,k):
     with torch.no_grad():
         model.eval()
@@ -304,14 +347,11 @@ def accuracy_nn_topk(train_dict,test_dict,unknown_list,model,k):
         
         correct = float(0)
         total = float(0)
-        file_write("started topk")
-        file_write(len(test_embeddings))
         for i in range(len(test_embeddings)):
-            file_write(i)
             predictions = classifier.nn_classify_topk(train_embeddings,train_ids,test_embeddings[i],k)
             target = test_ids[i]
             file_write("prediction")
-            file_write(predictions)
+            file_write(prediction)
             file_write("target")
             file_write(target)
             if(target in predictions): correct = correct + 1
@@ -356,7 +396,7 @@ def plot_tsne(embeddings,labels):
         x="d1", y="d2",
         hue="label",
         #palette=sns.color_palette("hls", len(reduced_data["label"])),
-        data=reduced_data[(reduced_data["label"]==unique_labels[5]) | (reduced_data["label"]==unique_labels[6]) ],
+        data=reduced_data,#[(reduced_data["label"]==unique_labels[5]) | (reduced_data["label"]==unique_labels[6]) ],
         legend="full",
         #alpha=0.3
     )
@@ -373,30 +413,44 @@ def plot_tsne(embeddings,labels):
 ###################################################################################################################
 #################################################----MAIN----######################################################
 ###################################################################################################################
-file_write("main")
-is_generate_dictionaries = True #True to generate dictionaries;;False to load dictionaries from _mini.pt files 
-is_train_net = True #True to train network and save weights,False to load network from _mini.pt file
-json_file = "mantaAnnotations.json" 
-image_dir = "scratch/mini/"
-#image_dir = "scratch/small_image_set/"
+(train_dict,test_dict,unknown_list) = generate_rmnist(20)
+file_write("dicts generated")
 
-###Generate Dataset### 
-if(is_generate_dictionaries):
-    dataset = generate_dataset(json_file,image_dir)
-    file_write("dataset generated")
-    
-###Generate and Save Dictionaries###
-if(is_generate_dictionaries):
-    (train_dict,test_dict,unknown_list) = generate_save_dictionaries(dataset)
-    file_write("dictionaries generated")
+# file_write("main")
+is_generate_dataset = False
+is_generate_dictionaries = False #True to generate dictionaries;;False to load dictionaries from _mn.pt files 
+is_train_net = False #True to train network and save weights,False to load network from _mn.pt file
+# json_file = "mantaAnnotations.json" 
+# image_dir = "scratch/small_image_set/"
+
+# ###Generate Dataset### 
+# if(is_generate_dataset):
+#     dataset = generate_mnist_dataset()
+#     file_write("dataset created")
+#     torch.save(dataset,"dataset_mn.pt")
+#     file_write("dataset saved")
+
+# if(not is_generate_dataset):
+#     dataset = torch.load("dataset_mn.pt")
+#     file_write("loaded dataset")
+
+
+# ###Generate and Save Dictionaries###
+# if(is_generate_dictionaries):
+#     (train_dict,test_dict,unknown_list) = generate_save_dictionaries(dataset)
+#     file_write("generated dictionaries")
     
 
-###Load Dictionaries###
-if(not is_generate_dictionaries):
-    train_dict = torch.load("train_dict_mini.pt")
-    test_dict = torch.load("test_dict_mini.pt")
-    unknown_list = torch.load("unknown_list_mini.pt")
-    file_write("dictionaries loaded")
+# ###Load Dictionaries###
+# if(not is_generate_dictionaries):
+#     file_write("loading dictionaries")
+#     train_dict = torch.load("train_dict_mn.pt")
+#     file_write("train dict loaded")
+#     test_dict = torch.load("test_dict_mn.pt")
+#     file_write("test dict loaded")
+#     unknown_list = torch.load("unknown_list_mn.pt")
+#     file_write("unknown dict loaded")
+
 
 ####Model###
 model = models.inception_v3(pretrained = True, transform_input = False)
@@ -408,7 +462,6 @@ weight_decay = 1e-5
 optimiser= optim.Adam(params = model.parameters(),lr = learning_rate,weight_decay = weight_decay)
 
 ###Training Loop OR Loading Weights###
-file_write("started training")
 epochs = 100
 batches_per_test_step = 1 #how many batches to train on before testing
 model.train()
@@ -416,8 +469,10 @@ if(is_train_net):
     train_losses = np.zeros(epochs)
     ###For Each Batch###
     #We treat a batch as an epoch
+    file_write("training net")
     for epoch in range(0,epochs):
         #Select Batch
+        #file_write(epoch)
         batch = batch_select(p=8,k=4,dictionary = train_dict) #randomly selects a size 8*4=32 batch
         batch_ims = batch[0] 
         batch_ids = batch[1]
@@ -431,18 +486,18 @@ if(is_train_net):
         loss.backward()
         optimiser.step()
         optimiser.zero_grad()
+    file_write("model trained")
     
     ###Save Model###
-    torch.save(model.state_dict(),"network_weights_mini.pt")
-    file_write("model trained")
+    torch.save(model.state_dict(),"network_weights_mn.pt")
     
     ###Plotting###
     plt.plot(train_losses)
-    plt.savefig("train_loss_mini.png")
+    plt.savefig("train_loss_mn.png")
 
 if(not is_train_net):
     ###Load Saved Weights###
-    model.load_state_dict(torch.load("network_weights_mini.pt"))
+    model.load_state_dict(torch.load("network_weights_mn.pt"))
     file_write("model loaded")
 
 # #Evaluate accuracy of model,
@@ -452,27 +507,24 @@ if(not is_train_net):
 # file_write("unknown_accuracy")
 # file_write(unknown_accuracy)
 
-# #Evaluate accuracy with simple nearest neighbour
-# simple_accuracy = accuracy_nn(train_dict,test_dict,unknown_list,model)
-# file_write("nn accuracy")
-# file_write(simple_accuracy)
-
-# #Evaluate accuracy with topk simple nearest neighbour
-with torch.no_grad():
-    simple_accuracy_topk = accuracy_nn_topk(train_dict,test_dict,unknown_list,model,5)
-    file_write("topk nn accuracy")
-    file_write(simple_accuracy_topk)
+#Evaluate accuracy with simple nearest neighbour
+simple_accuracy = accuracy_nn(train_dict,test_dict,unknown_list,model)
+file_write("nn accuracy")
+file_write(simple_accuracy)
 
 # TSNE Plot
-#(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings) = calculate_embeddings(train_dict,test_dict,unknown_list,model) 
-#torch.save(train_embeddings,"plotEmbeddings_mini.pt")
-#torch.save(train_ids,"plotIDs_mini.pt")
-#print("calculated embeddings")
-# train_embeddings = torch.load("plotEmbeddings_mini.pt")
-# train_ids = torch.load("plotIDs_mini.pt")
-# print("loaded embs")
-# plot_tsne(train_embeddings,train_ids)
-# print("plotted graphs")
+(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings) = calculate_embeddings(train_dict,test_dict,unknown_list,model) 
+# torch.save(train_embeddings,"plotEmbeddings_mn.pt")
+# torch.save(train_ids,"plotIDs_mn.pt")
+print("calculated embeddings")
+#train_embeddings = torch.load("plotEmbeddings_mn.pt")
+#train_ids = torch.load("plotIDs_mn.pt")
+#print("loaded embs")
+plot_tsne(train_embeddings,train_ids)
+print("plotted graphs")
+
+
+
 
 
 

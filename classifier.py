@@ -77,6 +77,42 @@ def osnn_classify(train_embs, train_labels, in_emb, threshold = 0.5):
     else: result = "unknown"
     return result
 
+#simple nearest neighbour
+def nn_classify(train_embs, train_labels, in_emb):
+    #compute list of distances from in_emb to each of train_embs
+    distances = []
+    for i in range(len(train_embs)):
+        distances.append((torch.norm(in_emb - train_embs[i])).item())
+    
+    #find closest embedding to in_emb (called t)
+    t_index = np.argmin(distances)
+    t_dist = distances[t_index]
+    t = train_embs[t_index]
+    t_label = train_labels[t_index]
+
+    return t_label
+
+#simple topk nn, returns k closest labels (with no duplicate labels)
+def nn_classify_topk(train_embs, train_labels, in_emb,k):
+    #compute list of distances from in_emb to each of train_embs
+    distances = []
+    for i in range(len(train_embs)):
+        distances.append((torch.norm(in_emb - train_embs[i])).item())
+    
+    ordered_indices = np.argsort(distances)
+
+    topk_labels = []
+    j = 0
+    while((len(topk_labels)<k) and (j < len(ordered_indices))):
+        ind = ordered_indices[j]
+        lab = train_labels[ind]
+        if(not lab in topk_labels):
+            topk_labels.append(lab)
+        j = j + 1
+    return topk_labels
+
+
+
 """
 The threshold T is between 0 and 1.
 An optimisation procedure can be used to select T
