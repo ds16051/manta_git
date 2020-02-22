@@ -36,16 +36,9 @@ class MantaDataset(Dataset):
         img_name = os.path.join(self.root_dir,
                                 self.labels_frame["annotations"][idx]["originalImageFileName"])
         image = io.imread(img_name) #at loading: (height,width,channels)
-        #image = Image.fromarray(np.uint8(image))
-        #draw = ImageDraw.Draw(image)
         
         
         label = self.labels_frame["annotations"][idx]["individualId"]
-        # box = self.labels_frame["annotations"][idx]["box_xmin_ymin_xmax_ymax"]
-        # x1 = box[0]
-        # x2 = box[2]
-        # y1 = box[1]
-        # y2 = box[3]
 
         image = transform.resize(image,(299,299))
         image = np.swapaxes(image,1,2)
@@ -62,26 +55,34 @@ class MantaDataset(Dataset):
 
 
 #myDataset is just a list of dictionaries, with each dictionary having structure  {'image': image, 'label': label}
-#the images are just squashed to 299 x 299, this is certainly not a good idea
-#maybe can use this as a basis from which to generate triplets for training
+
+dataset = MantaDataset(json_file = "~/Documents/mastersProject/manta_git/mantaAnnotations.json", root_dir = "~/Documents/mastersProject/manta_git/scratch/small_image_set_crop/")
+#(transforms.ToPILImage()(dataset[500]["image"])).show()
+
+image = dataset[0]["image"]
+
+####convert to PIL###
+image = (transforms.ToPILImage()(image)) 
+image.show()
+
+#rotation
+# image = (transforms.RandomRotation(degrees = 180,expand = True))(image)
+# image = image = transforms.Resize((299,299))(image)
+# image.show()
+
+#perspective
+#image = (transforms.RandomPerspective(distortion_scale = 0.85,p = 1))(image)
+#image.show()
+
+#affine
 
 
-dataset = MantaDataset(json_file = "~/Documents/mastersProject/manta_git/mantaAnnotations.json", root_dir = "~/Documents/mastersProject/manta_git/scratch/small_image_set/")
-(transforms.ToPILImage()(dataset[500]["image"])).show()
+#brightness/contrast
+image = (transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0, hue=0))(image)
+image.show()
 
-
-
-"""
-fig = plt.figure()
-for i in range(len(dataset)):
-    sample = dataset[i]
-    ax = plt.subplot(1, 4, i + 1)
-    plt.tight_layout()
-    ax.axis('off')
-    plt.imshow(sample["image"])
-    print(sample["label"])
-    if i == 3:
-        plt.show()
-        break
-"""
+###convert back to Tensor###
+image = (transforms.ToTensor())(image) 
+#print(image.shape)
+#(transforms.ToPILImage()(image)).show()
 

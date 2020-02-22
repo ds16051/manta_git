@@ -96,6 +96,7 @@ def generate_save_dictionaries(dataset):
 
 
 ###Batch Selection###
+#Try to do augmentation in here
 #NOTE: There are 10 images of each id
 """
 we construct a batch by selecting p random identities, and then k images for each identity, giving batch size pk
@@ -120,6 +121,15 @@ def batch_select(p,k,dictionary): #select p individuals, k photos of each, from 
         #for each chosen image of chosen individual
         for j in range(len(rands)):
             im = images_pool[rands[j]]
+            #im = (transforms.ToPILImage()(im)) #convert from tensor to PIL
+            #####AUGMENT DATA HERE#####
+            #im is (3,299,299) tensor
+
+
+            ###########################
+            #im = (transforms.ToTensor())(im) #convert from PIL back to tensor
+
+
             im = torch.unsqueeze(im,dim = 0) # change from (3,299,299) to (1,3,299,299)
             batch_images = torch.cat((batch_images,im),dim = 0) #append im to batch_images
             batch_labels.append(_id) # append corresponding id
@@ -185,7 +195,7 @@ def batch_hard_triplet_loss(labels,embeddings,margin):#returns triplet loss for 
 ###Calculate embeddings
 def calculate_embeddings(train_dict,test_dict,unknown_list,model):
     with torch.no_grad():
-        file_write("started function")
+        #file_write("started function")
         model.eval()
         train_embeddings = []
         train_ids = []
@@ -207,7 +217,7 @@ def calculate_embeddings(train_dict,test_dict,unknown_list,model):
                 embedding = model(image)
                 train_embeddings.append(embedding)
                 train_ids.append(key)
-        file_write("train embeddings done")
+        #file_write("train embeddings done")
         #torch.save(train_embeddings,"train_embeddings_mini.pt")
         #torch.save(train_ids,"train_ids_mini.pt")
         
@@ -224,7 +234,7 @@ def calculate_embeddings(train_dict,test_dict,unknown_list,model):
         
         # torch.save(test_embeddings,"test_embeddings_mini.pt")
         # torch.save(test_ids,"test_ids_mini.pt")
-        file_write("test embedding done")
+        #file_write("test embedding done")
 
         # #calculate unknown_embeddings
         for i in range(len(unknown_list)):
@@ -234,7 +244,7 @@ def calculate_embeddings(train_dict,test_dict,unknown_list,model):
             unknown_embeddings.append(embedding)
         
         # torch.save(unknown_embeddings,"unknown_embeddings_mini.pt")
-        file_write("unknown embedding done")
+        #file_write("unknown embedding done")
         
         return(train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings)
 
@@ -244,10 +254,10 @@ def accuracy(train_dict,test_dict,unknown_list,model):
         model.eval()
         #1) Caclulate embeddings from provided model
         (train_embeddings,train_ids,test_embeddings,test_ids,unknown_embeddings) = calculate_embeddings(train_dict,test_dict,unknown_list,model)
-        file_write("calculated embeddings")
+        #file_write("calculated embeddings")
         #2) Calculate OSNN threshold from training embeddings
         threshold = classifier.osnn_threshold(train_embeddings,train_ids)
-        file_write("calculated threshold")
+        #file_write("calculated threshold")
         #3) Calculate accuracy on test set
         correct = float(0)
         total = float(0)
@@ -257,8 +267,8 @@ def accuracy(train_dict,test_dict,unknown_list,model):
             if(prediction == target): correct = correct + 1
             total = total + 1
         test_accuracy = float(100) * (correct/total)
-        file_write("test accuracy calculated")
-        file_write(test_accuracy)
+        #file_write("test accuracy calculated")
+        #file_write(test_accuracy)
         #4) Caclulate accuracy on unknown set
         correct = float(0)
         total = float(0)
@@ -267,8 +277,8 @@ def accuracy(train_dict,test_dict,unknown_list,model):
             if(prediction == "unknown"): correct = correct + 1
             total = total + 1
         unknown_accuracy = float(100) * (correct/total)
-        file_write("unknown accuracy caclulated")
-        file_write(unknown_accuracy)
+        #file_write("unknown accuracy caclulated")
+        #file_write(unknown_accuracy)
 
         return(test_accuracy,unknown_accuracy)
 
@@ -283,17 +293,17 @@ def accuracy_nn(train_dict,test_dict,unknown_list,model):
         for i in range(len(test_embeddings)):
             prediction = classifier.nn_classify(train_embeddings,train_ids,test_embeddings[i])
             target = test_ids[i]
-            file_write("prediction")
-            file_write(prediction)
-            file_write("target")
-            file_write(target)
+            #file_write("prediction")
+            #file_write(prediction)
+            #file_write("target")
+            #file_write(target)
             if(prediction == target): correct = correct + 1
             total = total + 1
-        file_write("correct")
-        file_write(correct)
+        #file_write("correct")
+        #file_write(correct)
         test_accuracy = float(100) * (correct/total)
-        file_write("test accuracy calculated")
-        file_write(test_accuracy)
+        #file_write("test accuracy calculated")
+        #file_write(test_accuracy)
         return test_accuracy
 
 #simple nn accuracy  with topk
@@ -304,23 +314,23 @@ def accuracy_nn_topk(train_dict,test_dict,unknown_list,model,k):
         
         correct = float(0)
         total = float(0)
-        file_write("started topk")
-        file_write(len(test_embeddings))
+        #file_write("started topk")
+        #file_write(len(test_embeddings))
         for i in range(len(test_embeddings)):
-            file_write(i)
+            #file_write(i)
             predictions = classifier.nn_classify_topk(train_embeddings,train_ids,test_embeddings[i],k)
             target = test_ids[i]
-            file_write("prediction")
-            file_write(predictions)
-            file_write("target")
-            file_write(target)
+            #file_write("prediction")
+            #file_write(predictions)
+            #file_write("target")
+            #file_write(target)
             if(target in predictions): correct = correct + 1
             total = total + 1
-        file_write("correct")
-        file_write(correct)
+        #file_write("correct")
+        #file_write(correct)
         test_accuracy = float(100) * (correct/total)
-        file_write("top k test accuracy calculated")
-        file_write(test_accuracy)
+        #file_write("top k test accuracy calculated")
+        #file_write(test_accuracy)
         return test_accuracy
 
 #takes a set of embeddings, and performs dimensionality reduction using t-SNE.
@@ -373,11 +383,12 @@ def plot_tsne(embeddings,labels):
 ###################################################################################################################
 #################################################----MAIN----######################################################
 ###################################################################################################################
-file_write("main")
-is_generate_dictionaries = True #True to generate dictionaries;;False to load dictionaries from _mini.pt files 
+#file_write("main")
+is_generate_dictionaries = False #True to generate dictionaries;;False to load dictionaries from _mini.pt files 
 is_train_net = True #True to train network and save weights,False to load network from _mini.pt file
 json_file = "mantaAnnotations.json" 
-image_dir = "scratch/mini/"
+image_dir = "scratch/small_image_set_crop/"
+#image_dir = "scratch/mini/"
 #image_dir = "scratch/small_image_set/"
 
 ###Generate Dataset### 
@@ -410,10 +421,11 @@ optimiser= optim.Adam(params = model.parameters(),lr = learning_rate,weight_deca
 ###Training Loop OR Loading Weights###
 file_write("started training")
 epochs = 100
-batches_per_test_step = 1 #how many batches to train on before testing
+batches_per_test_step = 5 #how many batches to train on before testing
 model.train()
 if(is_train_net):
     train_losses = np.zeros(epochs)
+    test_accuracies = []
     ###For Each Batch###
     #We treat a batch as an epoch
     for epoch in range(0,epochs):
@@ -425,6 +437,11 @@ if(is_train_net):
         ###Compute Embeddings On Batch###
         embeddings = model(batch_ims)[0] #32 * 128, the [0] is because inception net also gives an auxiliary output during training, but not during evaluation.
         
+        ###Compute Accuracy On Batch
+        # if((epoch % batches_per_test_step == 0)):
+        #     simple_accuracy = accuracy_nn(train_dict,test_dict,unknown_list,model)
+        #     test_accuracies.append(simple_accuracy)
+
         ###Compute Loss On Batch ###
         loss = batch_hard_triplet_loss(batch_ids,embeddings,0.2)
         train_losses[epoch] = loss
@@ -440,22 +457,25 @@ if(is_train_net):
     plt.plot(train_losses)
     plt.savefig("train_loss_mini.png")
 
+    # plt.plot(np.array(test_accuracies))
+    # plt.savefig("test_accuracies_mini.png")
+
 if(not is_train_net):
     ###Load Saved Weights###
     model.load_state_dict(torch.load("network_weights_mini.pt"))
     file_write("model loaded")
 
-# #Evaluate accuracy of model,
-# (test_accuracy,unknown_accuracy) = accuracy(train_dict,test_dict,unknown_list,model)
-# file_write("test_accuracy")
-# file_write(test_accuracy)
-# file_write("unknown_accuracy")
-# file_write(unknown_accuracy)
+#Evaluate accuracy of model,
+(test_accuracy,unknown_accuracy) = accuracy(train_dict,test_dict,unknown_list,model)
+file_write("osnn test_accuracy")
+file_write(test_accuracy)
+file_write("osnn unknown_accuracy")
+file_write(unknown_accuracy)
 
-# #Evaluate accuracy with simple nearest neighbour
-# simple_accuracy = accuracy_nn(train_dict,test_dict,unknown_list,model)
-# file_write("nn accuracy")
-# file_write(simple_accuracy)
+#Evaluate accuracy with simple nearest neighbour
+simple_accuracy = accuracy_nn(train_dict,test_dict,unknown_list,model)
+file_write("nn accuracy")
+file_write(simple_accuracy)
 
 # #Evaluate accuracy with topk simple nearest neighbour
 with torch.no_grad():
